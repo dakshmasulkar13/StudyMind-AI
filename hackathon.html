@@ -1,0 +1,964 @@
+Claude
+
+
+Studymind ai · HTML
+<title>StudyMind AI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: a fixed WebGL world (grid tunnel, portals, robot teachers) sits behind everything.
+   Each page is a room the camera flies to. Scrolling flies the camera from robot to robot while
+   HUD-framed panels tilt and slide over the scene. Single dark look, borrowed from the app's palette. */
+:root{
+  --bg:#111827; --panel:#1F2937; --panel-hi:#2A3648; --line:#374151;
+  --violet:#8B5CF6; --violet-soft:#A78BFA; --cyan:#22D3EE;
+  --text:#F9FAFB; --body:#D1D5DB; --muted:#9CA3AF;
+  --ok:#34D399; --warn:#FBBF24; --err:#F87171;
+  --font-display:'Unbounded','Arial Black',system-ui,sans-serif;
+  --font-body:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Consolas,monospace;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--body);font:400 1rem/1.65 var(--font-body);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--bg)}
+a{color:var(--cyan)}
+p{margin:0 0 1em;max-width:65ch}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+ 
+#world,#rain{position:fixed;inset:0;width:100%;height:100%;display:block}
+#world{z-index:0}
+#rain{z-index:1;opacity:.17;pointer-events:none}
+main,footer{position:relative;z-index:2}
+ 
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--bg);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 24px;padding-block:10px}
+.brand{display:flex;align-items:center;gap:.7rem;font:700 .9rem var(--font-display);letter-spacing:.02em;color:var(--text);text-decoration:none}
+.brand i{width:13px;height:13px;background:var(--cyan);transform:rotate(45deg);display:block}
+.main-nav{display:flex;gap:2px;overflow-x:auto;max-width:100%;scrollbar-width:none}
+.main-nav::-webkit-scrollbar{display:none}
+.main-nav a,.foot-nav a{font:500 .76rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:.7rem .8rem;border-bottom:2px solid transparent;white-space:nowrap}
+.main-nav a:hover,.foot-nav a:hover{color:var(--text)}
+.main-nav a[aria-current="page"]{color:var(--text);border-bottom-color:var(--cyan)}
+ 
+/* type */
+.eyebrow{font:500 .74rem var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);margin:0 0 1rem}
+h1,h2,h3{font-family:var(--font-display);color:var(--text);margin:0;text-wrap:balance}
+h2{font-weight:700;font-size:clamp(1.6rem,3.8vw,2.8rem);line-height:1.12;letter-spacing:-.02em;margin-bottom:.6em}
+h3{font-weight:600;font-size:1rem;line-height:1.3;margin-bottom:.5em}
+.mega{font-weight:900;font-size:clamp(2.6rem,6.6vw,6rem);line-height:.92;letter-spacing:-.03em;text-transform:uppercase;text-shadow:4px 4px 0 rgba(139,92,246,.55)}
+.mega span{display:block}
+.mega .c{color:var(--cyan)} .mega .v{color:var(--violet-soft)}
+.mega.name{font-size:clamp(2.2rem,6vw,4.8rem)}
+.lead{font-size:clamp(1.05rem,1.6vw,1.25rem);color:var(--body);max-width:52ch}
+ 
+/* tags + buttons: squared, never pills */
+.tag{display:inline-block;font:500 .7rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--body);border:1px solid var(--line);background:var(--bg);padding:.3rem .55rem;border-radius:2px}
+.tag.hot{color:var(--cyan);border-color:var(--cyan)}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 1.4rem}
+.btn{display:inline-flex;align-items:center;gap:.7rem;font:500 .8rem var(--font-mono);letter-spacing:.1em;text-transform:uppercase;text-decoration:none;color:#0B1020;background:var(--cyan);border:2px solid var(--text);border-radius:2px;padding:.95rem 1.3rem;box-shadow:4px 4px 0 var(--violet);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--violet)}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--violet)}
+.btn.ghost{background:var(--bg);color:var(--text)}
+.btn.sm{padding:.6rem .9rem;font-size:.72rem;box-shadow:3px 3px 0 var(--violet)}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+ 
+/* layout blocks */
+.page{position:relative;overflow-x:clip;animation:enter .7s cubic-bezier(.2,.7,.2,1)}
+@keyframes enter{from{translate:0 48px}to{translate:0 0}}
+.hero{padding-block:clamp(40px,7vw,90px)}
+.hero .wrap{display:flex;flex-direction:column}
+.hero-copy{max-width:min(660px,100%)}
+.hero-slot,.robot-slot{display:none}
+.sec{padding-block:clamp(48px,8vw,110px)}
+.panel{position:relative;background:rgba(31,41,55,.92);border:1px solid var(--line);border-radius:4px;padding:clamp(20px,3vw,36px);
+  transform:perspective(1100px) rotateX(calc(var(--sx,0deg) + var(--hx,0deg))) rotateY(var(--hy,0deg));transition:transform .2s ease-out}
+.panel::before,.panel::after{content:"";position:absolute;width:16px;height:16px;border:0 solid var(--cyan)}
+.panel::before{top:-1px;left:-1px;border-top-width:2px;border-left-width:2px}
+.panel::after{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+.card{background:rgba(31,41,55,.92);border:1px solid var(--line);border-radius:4px;padding:20px;min-width:0}
+.card p{margin:0;font-size:.95rem;color:var(--body)}
+.g2,.g3,.g4{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+.g2>*,.g3>*,.g4>*{min-width:0}
+.sec-head{max-width:760px;margin-bottom:clamp(24px,4vw,44px)}
+ 
+/* marquee loop */
+.marquee{border-block:1px solid var(--line);background:var(--bg);overflow:hidden}
+.marquee-track{display:flex;width:max-content;animation:slide 40s linear infinite}
+.marquee-track span{font:500 .82rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:14px 0 14px 26px;white-space:nowrap}
+.marquee-track span::after{content:"/";margin-left:26px;color:var(--violet)}
+@keyframes slide{to{transform:translateX(-50%)}}
+ 
+/* ghost parallax words */
+.ghost{position:absolute;left:0;white-space:nowrap;font:900 clamp(6rem,24vw,22rem)/1 var(--font-display);color:transparent;-webkit-text-stroke:1px rgba(139,92,246,.4);pointer-events:none;user-select:none;z-index:0;text-transform:uppercase}
+.page>section,#featBody{position:relative;z-index:1}
+.marquee{position:relative;z-index:1}
+main:focus{outline:none}
+ 
+/* reveal: text always visible, only offset */
+.js .rv{translate:0 34px;transition:translate .85s cubic-bezier(.2,.7,.2,1);transition-delay:var(--d,0s)}
+.js .rv.in{translate:0 0}
+ 
+/* interludes: robot teachers speak */
+.iw{display:flex;align-items:center;min-height:92vh;min-height:92svh;padding-block:40px}
+.cap-left .iw{justify-content:flex-start}
+.cap-right .iw{justify-content:flex-end}
+.speech{max-width:430px}
+.speech p{font:500 1.15rem/1.5 var(--font-body);color:var(--text);margin:.9rem 0 0}
+ 
+/* steps + stats */
+.steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px}
+.step{position:relative;padding:20px;border:1px solid var(--line);background:rgba(31,41,55,.92);border-radius:4px}
+.step::before{counter-increment:s;content:"0" counter(s);display:block;font:500 .78rem var(--font-mono);color:var(--cyan);letter-spacing:.14em;margin-bottom:.9rem}
+.step p{margin:0;font-size:.95rem}
+.stat{border:1px solid var(--line);background:rgba(31,41,55,.92);padding:20px;border-radius:4px}
+.stat b{display:block;font:900 clamp(2.2rem,4.5vw,3.4rem)/1 var(--font-display);color:var(--cyan);margin-bottom:.4rem}
+.stat span{font:500 .72rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+ 
+/* device mocks */
+.devices{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-end}
+.dev{border:2px solid var(--text);background:var(--bg);border-radius:4px;position:relative}
+.phone{width:150px;height:290px;display:flex;flex-direction:column}
+.phone .dev-body{flex:1;padding:14px 10px;display:grid;gap:8px;align-content:start}
+.dev i{display:block;height:26px;background:var(--panel-hi);border:1px solid var(--line)}
+.dev i.w{height:48px;border-color:var(--violet)}
+.dev-nav{display:flex;justify-content:space-around;padding:10px 6px;border-top:2px solid var(--text)}
+.dev-nav b{width:18px;height:18px;border:2px solid var(--muted);display:block}
+.dev-nav b:first-child{border-color:var(--cyan);background:var(--cyan)}
+.desk{width:min(100%,380px);height:230px;display:flex}
+.dev-side{width:64px;border-right:2px solid var(--text);display:grid;gap:10px;align-content:start;justify-items:center;padding:14px 0}
+.dev-side b{width:20px;height:20px;border:2px solid var(--muted);display:block}
+.dev-side b:first-child{border-color:var(--cyan);background:var(--cyan)}
+.desk .dev-body{flex:1;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}
+.desk .dev-body i.w{grid-column:1/-1}
+.dev-label{font:500 .7rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:10px;display:block}
+ 
+/* features page */
+.feat{display:grid;grid-template-columns:210px minmax(0,1fr);gap:32px;align-items:start}
+.index{position:sticky;top:calc(env(safe-area-inset-top,0px) + 92px);display:flex;flex-direction:column;border-left:1px solid var(--line)}
+.index a{font:500 .74rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:.55rem .9rem;border-left:2px solid transparent;margin-left:-1px}
+.index a:hover{color:var(--text)}
+.index a[aria-current="true"]{color:var(--cyan);border-left-color:var(--cyan)}
+.mods{display:grid;gap:28px;min-width:0}
+.mod{scroll-margin-top:110px}
+.mod .sum{font-size:1.1rem;color:var(--text);max-width:56ch}
+.fl{list-style:none;margin:1.4rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px 28px}
+.fl li{position:relative;padding-left:20px;font-size:.96rem}
+.fl li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;background:var(--violet)}
+.rule{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:baseline;margin-top:1.6rem;padding-top:1.2rem;border-top:1px dashed var(--line)}
+.rule p{margin:0;flex:1 1 280px;font-size:.93rem;color:var(--muted)}
+.widget{margin-top:1.6rem;padding:20px;border:1px dashed var(--violet);border-radius:4px;background:rgba(17,24,39,.7)}
+.widget .wl{font:500 .7rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--violet-soft);margin-bottom:12px;display:block}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--text);border-radius:2px}
+.seg button{font:500 .74rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;background:var(--bg);color:var(--body);border:0;padding:.65rem .95rem;cursor:pointer}
+.seg button+button{border-left:1px solid var(--text)}
+.seg button[aria-pressed="true"]{background:var(--cyan);color:#0B1020}
+.lvtext{margin:14px 0 0;max-width:56ch;color:var(--text)}
+.flip{display:block;width:100%;max-width:340px;height:200px;perspective:900px;background:none;border:0;padding:0;cursor:pointer;color:var(--text)}
+.flip-in{position:relative;display:block;width:100%;height:100%;transition:transform .7s cubic-bezier(.2,.7,.2,1);transform-style:preserve-3d}
+.flip[aria-pressed="true"] .flip-in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:20px;text-align:left;border:2px solid var(--text);border-radius:4px;background:var(--panel);backface-visibility:hidden;-webkit-backface-visibility:hidden;font:500 1.05rem/1.4 var(--font-body)}
+.face small{font:500 .68rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+.face.back{transform:rotateY(180deg);border-color:var(--violet);background:var(--bg)}
+.rate{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.rate button{font:500 .72rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:2px;padding:.55rem .8rem;cursor:pointer}
+.rate button:hover{border-color:var(--cyan);color:var(--cyan)}
+.pomo-time{font:700 clamp(2.6rem,7vw,4rem)/1 var(--font-mono);color:var(--text);letter-spacing:.04em;margin:4px 0 14px;font-variant-numeric:tabular-nums}
+.note{font-size:.88rem;color:var(--muted);margin:12px 0 0}
+.wire{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.wire div{border:1px dashed var(--muted);padding:10px;font:500 .68rem var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--body);min-height:54px;display:flex;align-items:flex-end;min-width:0;overflow-wrap:anywhere}
+.wire .s6{grid-column:span 6}.wire .s3{grid-column:span 3}.wire .s2{grid-column:span 2}.wire .s1{grid-column:span 1}
+.wire .qa{border-color:var(--cyan);color:var(--cyan)}
+ 
+/* tech + build */
+.svgbox{overflow-x:auto;border:1px solid var(--line);background:rgba(17,24,39,.9);border-radius:4px}
+.svgbox svg{display:block;min-width:760px;width:100%;height:auto}
+.svgbox .t{font:500 12px var(--font-mono);fill:#F9FAFB;letter-spacing:.08em;text-transform:uppercase}
+.svgbox .s{font:400 11.5px var(--font-body);fill:#9CA3AF}
+.chips{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px}
+.chips li{position:relative;padding:12px 14px 12px 34px;border:1px solid var(--line);background:rgba(31,41,55,.92);border-radius:4px;font-size:.93rem}
+.chips li::before{content:"";position:absolute;left:14px;top:1.1em;width:8px;height:8px;background:var(--cyan)}
+.swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.sw{display:flex;gap:12px;align-items:center;border:1px solid var(--line);padding:10px;background:rgba(31,41,55,.92);border-radius:4px;min-width:0}
+.sw i{width:44px;height:44px;flex:none;border:1px solid var(--muted);display:block}
+.sw b{display:block;font:600 .8rem var(--font-body);color:var(--text)}
+.sw span{font:400 .72rem var(--font-mono);color:var(--muted)}
+.timeline{list-style:none;margin:0;padding:0;display:grid;gap:0;border-left:2px solid var(--line);margin-left:9px}
+.timeline li{position:relative;padding:0 0 26px 34px;color:var(--text);font-size:1.02rem}
+.timeline li::before{content:"";position:absolute;left:-10px;top:.4em;width:18px;height:18px;background:var(--bg);border:2px solid var(--cyan)}
+.timeline li small{display:block;font:500 .7rem var(--font-mono);letter-spacing:.14em;color:var(--cyan);text-transform:uppercase;margin-bottom:2px}
+pre{margin:0;overflow-x:auto;font:400 .84rem/1.7 var(--font-mono);color:var(--body);background:var(--bg);border:1px solid var(--line);padding:16px;border-radius:2px}
+pre .k{color:var(--violet-soft)} pre .m{color:var(--muted)}
+.dl{display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1fr);gap:0;margin:0}
+.dl dt,.dl dd{margin:0;padding:12px 0;border-bottom:1px solid var(--line)}
+.dl dt{font:500 .72rem var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);padding-top:15px}
+.dl dd{color:var(--text)}
+.praise{display:block;font:900 clamp(1.7rem,5vw,4rem)/1.08 var(--font-display);letter-spacing:-.025em;color:var(--text);text-transform:uppercase;text-wrap:balance;max-width:20ch}
+.praise em{font-style:normal;color:var(--cyan)}
+.praise.alt em{color:var(--violet-soft)}
+.praises{display:grid;gap:clamp(40px,8vw,120px)}
+ 
+/* footer */
+.foot{border-top:1px solid var(--line);background:var(--bg);padding-block:40px}
+.foot .wrap{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:flex-start}
+.foot p{margin:0;font-size:.88rem;color:var(--muted)}
+.foot-nav{display:flex;flex-wrap:wrap;gap:0 4px}
+ 
+/* responsive */
+@media (max-width:900px){
+  .mega{font-size:clamp(2.6rem,12vw,4.4rem)}
+  .mega.name{font-size:clamp(2.2rem,10.5vw,4rem)}
+  .hero-slot{display:block;height:46vh;height:46svh}
+  .iw{flex-direction:column;justify-content:flex-start!important;align-items:stretch;padding-block:24px 48px}
+  .robot-slot{display:block;height:50vh;height:50svh}
+  .speech{max-width:none}
+  .feat{grid-template-columns:1fr}
+  .index{position:static;flex-direction:row;overflow-x:auto;border-left:0;border-bottom:1px solid var(--line)}
+  .index a{border-left:0;border-bottom:2px solid transparent;margin:0;white-space:nowrap}
+  .index a[aria-current="true"]{border-bottom-color:var(--cyan)}
+  .wire{grid-template-columns:repeat(2,1fr)}
+  .wire .s6,.wire .s3,.wire .s2,.wire .s1{grid-column:span 2}
+  .wire .s1,.wire .s2{grid-column:span 1}
+}
+@media (max-width:520px){
+  .mega{text-shadow:3px 3px 0 rgba(139,92,246,.55)}
+  .dl{grid-template-columns:1fr}.dl dt{padding-bottom:0;border-bottom:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .js .rv{translate:none}
+  .marquee{overflow-x:auto}
+  .panel{transform:none}
+}
+</style>
+ 
+<canvas id="world" aria-hidden="true"></canvas>
+<canvas id="rain" aria-hidden="true"></canvas>
+ 
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#home" data-nav="home"><i></i>StudyMind AI</a>
+    <nav class="main-nav" aria-label="Pages">
+      <a href="#home" data-nav="home">Home</a>
+      <a href="#features" data-nav="features">Features</a>
+      <a href="#tech" data-nav="tech">Under the hood</a>
+      <a href="#build" data-nav="build">Build</a>
+      <a href="#creator" data-nav="creator">Creator</a>
+    </nav>
+  </div>
+</header>
+ 
+<main id="main">
+<noscript><div class="wrap sec"><p>This site is a scripted 3D experience. Turn on JavaScript to explore StudyMind AI.</p></div></noscript>
+ 
+<!-- ========== HOME ========== -->
+<div class="page" id="page-home" hidden>
+  <div class="ghost" data-depth="0.18" style="top:70vh" aria-hidden="true">Learn</div>
+  <div class="ghost" data-depth="-0.1" style="top:250vh;left:12vw" aria-hidden="true">Focus</div>
+ 
+  <section class="hero stage-point">
+    <div class="wrap">
+      <div class="hero-copy">
+        <div class="tags"><span class="tag hot">Hackathon build</span><span class="tag">Android</span><span class="tag">Windows</span></div>
+        <h1 class="mega"><span>Study</span><span class="v">Mind</span><span class="c">AI</span></h1>
+        <p class="lead">The study assistant that reads your own notes, explains them at your level, and turns them into quizzes, flashcards and a plan.</p>
+        <div class="row">
+          <a class="btn" href="#features">Explore features &rarr;</a>
+          <a class="btn ghost" href="#creator">Meet the creator</a>
+        </div>
+      </div>
+      <div class="robot-slot hero-slot"></div>
+    </div>
+  </section>
+ 
+  <div class="marquee" aria-hidden="true"><div class="marquee-track" id="marquee"></div></div>
+ 
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <p class="eyebrow">What it is</p>
+        <h2>One assistant. Your own material. Real practice.</h2>
+        <p>StudyMind AI runs on Android phones and Windows computers. Upload your PDFs, TXT and DOCX notes, ask questions grounded in them, then practise with quizzes and flashcards that come from the same material.</p>
+      </div>
+      <div class="steps">
+        <div class="step rv"><h3>Upload</h3><p>Drop in PDF, TXT or DOCX notes. Text is extracted and organised into folders.</p></div>
+        <div class="step rv" style="--d:.08s"><h3>Ask</h3><p>Get explanations at your level, summaries, and answers that cite the page they came from.</p></div>
+        <div class="step rv" style="--d:.16s"><h3>Practise</h3><p>Generate quizzes and flashcards straight from the notes you picked.</p></div>
+        <div class="step rv" style="--d:.24s"><h3>Plan and track</h3><p>Schedule sessions, run a focus timer, and see progress built from real stored events.</p></div>
+      </div>
+    </div>
+  </section>
+ 
+  <section class="interlude stage-point cap-right">
+    <div class="wrap iw">
+      <div class="robot-slot"></div>
+      <div class="speech panel rv"><span class="tag hot">FLASH</span><p>Rate a card Again, Hard, Good or Easy. I handle when it comes back.</p></div>
+    </div>
+  </section>
+ 
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <p class="eyebrow">At a glance</p>
+        <h2>Two screens. One brand.</h2>
+        <p>Android gets a bottom navigation bar and touch-friendly controls. Windows gets a sidebar, keyboard navigation and mouse support. The look stays the same on both.</p>
+      </div>
+      <div class="g4" style="margin-bottom:28px">
+        <div class="stat rv"><b>14</b><span>Screens</span></div>
+        <div class="stat rv" style="--d:.06s"><b>8</b><span>Core modules</span></div>
+        <div class="stat rv" style="--d:.12s"><b>3</b><span>Explanation levels</span></div>
+        <div class="stat rv" style="--d:.18s"><b>4</b><span>Recall ratings</span></div>
+      </div>
+      <div class="panel rv">
+        <div class="devices">
+          <div>
+            <div class="dev phone" aria-hidden="true"><div class="dev-body"><i></i><i class="w"></i><i></i><i></i></div><div class="dev-nav"><b></b><b></b><b></b><b></b></div></div>
+            <span class="dev-label">Android · bottom nav</span>
+          </div>
+          <div style="flex:1 1 300px;min-width:0">
+            <div class="dev desk" aria-hidden="true"><div class="dev-side"><b></b><b></b><b></b><b></b><b></b></div><div class="dev-body"><i class="w"></i><i></i><i></i><i></i><i></i></div></div>
+            <span class="dev-label">Windows · sidebar</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+ 
+  <section class="interlude stage-point cap-left">
+    <div class="wrap iw">
+      <div class="robot-slot"></div>
+      <div class="speech panel rv"><span class="tag hot">QUIZ-O</span><p>Pick a document and a difficulty. I write the questions from your material.</p></div>
+    </div>
+  </section>
+ 
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <p class="eyebrow">The modules</p>
+        <h2>Eight modules, every one working together.</h2>
+      </div>
+      <div class="g4" id="teasers"></div>
+      <div class="row rv" style="margin-top:36px">
+        <a class="btn" href="#features">See every feature &rarr;</a>
+        <a class="btn ghost" href="#tech">How it's built</a>
+      </div>
+    </div>
+  </section>
+</div>
+ 
+<!-- ========== FEATURES ========== -->
+<div class="page" id="page-features" hidden>
+  <div class="ghost" data-depth="0.2" style="top:110vh" aria-hidden="true">Feature</div>
+  <section class="hero stage-point">
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">Features</p>
+        <h1 class="mega"><span>Every</span><span class="v">feature</span><span class="c">Listed.</span></h1>
+        <p class="lead">Eight modules, each with what it does and the rule it keeps. Scroll through them, or jump from the index.</p>
+      </div>
+      <div class="robot-slot hero-slot"></div>
+    </div>
+  </section>
+  <div id="featBody"></div>
+</div>
+ 
+<!-- ========== TECH ========== -->
+<div class="page" id="page-tech" hidden>
+  <div class="ghost" data-depth="0.2" style="top:100vh" aria-hidden="true">Stack</div>
+  <div class="ghost" data-depth="-0.1" style="top:300vh;left:10vw" aria-hidden="true">Secure</div>
+  <section class="hero stage-point">
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">Under the hood</p>
+        <h1 class="mega"><span>How</span><span class="v">it's</span><span class="c">Built</span></h1>
+        <p class="lead">One TypeScript codebase for the screens. A protected backend for anything that needs a secret. A local database so studying keeps working when the Wi-Fi doesn't.</p>
+        <div class="tags"><span class="tag">React Native</span><span class="tag">Expo</span><span class="tag">TypeScript</span><span class="tag">SQLite</span><span class="tag">Secure API</span></div>
+      </div>
+      <div class="robot-slot hero-slot"></div>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Architecture</p><h2>Clients, a protected API, and two data stores.</h2></div>
+      <div class="svgbox panel rv" style="padding:0">
+        <svg viewBox="0 0 920 400" role="img" aria-label="Architecture diagram. Android and Windows clients, each with a local SQLite cache, talk over HTTPS to a protected backend API. The backend calls an AI model provider and a hosted database.">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8B5CF6"/></marker></defs>
+          <rect x="20" y="40" width="230" height="130" fill="#1F2937" stroke="#374151"/>
+          <text class="t" x="36" y="68">Android app</text><text class="s" x="36" y="88">React Native + Expo</text>
+          <rect x="36" y="108" width="198" height="40" fill="#111827" stroke="#9CA3AF" stroke-dasharray="4 3"/><text class="s" x="48" y="132">SQLite · offline cache</text>
+          <rect x="20" y="210" width="230" height="130" fill="#1F2937" stroke="#374151"/>
+          <text class="t" x="36" y="238">Windows app</text><text class="s" x="36" y="258">React UI in a desktop shell</text>
+          <rect x="36" y="278" width="198" height="40" fill="#111827" stroke="#9CA3AF" stroke-dasharray="4 3"/><text class="s" x="48" y="302">SQLite · offline cache</text>
+          <path d="M250 105H300V190H358" fill="none" stroke="#8B5CF6" stroke-width="2" marker-end="url(#ar)"/>
+          <path d="M250 275H300V190" fill="none" stroke="#8B5CF6" stroke-width="2"/>
+          <text class="s" x="262" y="182">HTTPS</text>
+          <rect x="360" y="40" width="250" height="300" fill="#1F2937" stroke="#22D3EE" stroke-width="2"/>
+          <text class="t" x="378" y="70" fill="#22D3EE" style="fill:#22D3EE">Protected backend API</text>
+          <g fill="#111827" stroke="#374151">
+            <rect x="378" y="92" width="214" height="34"/><rect x="378" y="134" width="214" height="34"/><rect x="378" y="176" width="214" height="34"/><rect x="378" y="218" width="214" height="34"/><rect x="378" y="260" width="214" height="34"/>
+          </g>
+          <text class="s" x="390" y="114">Auth + secure sessions</text><text class="s" x="390" y="156">Rate limits + quotas</text><text class="s" x="390" y="198">Upload validation</text><text class="s" x="390" y="240">Ownership checks</text><text class="s" x="390" y="282">Untrusted-text handling</text>
+          <path d="M610 100H680" fill="none" stroke="#8B5CF6" stroke-width="2" marker-end="url(#ar)"/>
+          <path d="M610 280H680" fill="none" stroke="#8B5CF6" stroke-width="2" marker-end="url(#ar)"/>
+          <rect x="680" y="50" width="220" height="100" fill="#1F2937" stroke="#374151"/>
+          <text class="t" x="696" y="82">AI model provider</text><text class="s" x="696" y="104">API keys live on the server only</text>
+          <rect x="680" y="230" width="220" height="100" fill="#1F2937" stroke="#374151"/>
+          <text class="t" x="696" y="262">Hosted database</text><text class="s" x="696" y="284">Accounts + synced study data</text>
+        </svg>
+      </div>
+      <div class="g2" style="margin-top:20px" id="stack"></div>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="panel rv">
+        <p class="eyebrow">A website is not a Windows app</p>
+        <h2>Two deliberate ways to ship.</h2>
+        <p>Android ships from Expo's build service as an APK or AAB. Windows is a separate packaging step: the web build is wrapped in a desktop shell such as Electron or Tauri and bundled into an installer. Nothing about the Windows version happens by accident.</p>
+      </div>
+    </div>
+  </section>
+ 
+  <section class="interlude stage-point cap-right">
+    <div class="wrap iw">
+      <div class="robot-slot"></div>
+      <div class="speech panel rv"><span class="tag hot">SENTRY</span><p>Text inside an uploaded file is untrusted input. Nothing in a document gets to override the app's rules.</p></div>
+    </div>
+  </section>
+ 
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Security model</p><h2>Twelve rules the backend enforces.</h2></div>
+      <div class="g3" id="security"></div>
+      <div class="panel rv" style="margin-top:20px"><span class="tag hot">Honest note</span><p style="margin:.9rem 0 0;color:var(--text)">StudyMind AI is not claimed to be breach-proof. No app is. Remaining risks are documented, and production security checks are required before launch.</p></div>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Performance</p><h2>Built for everyday devices and average connections.</h2></div>
+      <ul class="chips" id="perf"></ul>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Accessibility</p><h2>Usable by touch, keyboard and screen reader.</h2></div>
+      <ul class="chips" id="a11y"></ul>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Design system</p><h2>Two themes, one identity.</h2><p>This site borrows the app's dark palette on purpose. Gradients are used sparingly in the app and not at all here.</p></div>
+      <p class="eyebrow rv" style="color:var(--violet-soft)">Dark theme</p>
+      <div class="swatches" id="sw-dark" style="margin-bottom:28px"></div>
+      <p class="eyebrow rv" style="color:var(--violet-soft)">Light theme</p>
+      <div class="swatches" id="sw-light"></div>
+    </div>
+  </section>
+</div>
+ 
+<!-- ========== BUILD ========== -->
+<div class="page" id="page-build" hidden>
+  <div class="ghost" data-depth="0.2" style="top:100vh" aria-hidden="true">Ship</div>
+  <div class="ghost" data-depth="-0.1" style="top:320vh;left:8vw" aria-hidden="true">MVP</div>
+  <section class="hero stage-point">
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">Build plan</p>
+        <h1 class="mega"><span>How</span><span class="v">it</span><span class="c">Ships</span></h1>
+        <p class="lead">Build in stages, ship a working MVP first, and say plainly what is not done.</p>
+      </div>
+      <div class="robot-slot hero-slot"></div>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Nine stages, in order</p><h2>From architecture to documentation.</h2></div>
+      <ol class="timeline" id="stages"></ol>
+    </div>
+  </section>
+ 
+  <section class="interlude stage-point cap-right">
+    <div class="wrap iw">
+      <div class="robot-slot"></div>
+      <div class="speech panel rv"><span class="tag hot">MENTOR</span><p>A reliable core beats a long list of half-finished features. MVP first.</p></div>
+    </div>
+  </section>
+ 
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Packaging</p><h2>Getting installable apps out of one codebase.</h2></div>
+      <div class="g2">
+        <div class="panel rv">
+          <h3>Android</h3>
+          <p style="font-size:.95rem">Develop with Expo, then build in the cloud for an APK or AAB.</p>
+<pre><span class="k">npx</span> create-expo-app studymind
+<span class="k">npx</span> expo start      <span class="m"># Expo Go or an emulator</span>
+<span class="k">npm</span> i -g eas-cli
+<span class="k">eas</span> build -p android <span class="m"># APK or AAB</span></pre>
+        </div>
+        <div class="panel rv" style="--d:.1s">
+          <h3>Windows</h3>
+          <p style="font-size:.95rem">Export the web build, wrap it in a desktop shell, bundle an installer.</p>
+<pre><span class="k">npx</span> expo export -p web   <span class="m"># static web build</span>
+<span class="m"># wrap dist/ in Electron or Tauri</span>
+<span class="k">npx</span> electron-builder --win <span class="m"># installer</span></pre>
+        </div>
+      </div>
+      <p class="note rv">Indicative commands. Exact flags depend on the project's configuration.</p>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Required screens</p><h2>Fourteen screens with working navigation.</h2></div>
+      <div class="g4" id="screens"></div>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Deliverables</p><h2>What the project commits to handing over.</h2></div>
+      <ul class="chips" id="deliver"></ul>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="panel rv">
+        <p class="eyebrow">Said out loud</p>
+        <h2>Limits we state up front.</h2>
+        <ul class="fl" id="limits"></ul>
+      </div>
+    </div>
+  </section>
+</div>
+ 
+<!-- ========== CREATOR ========== -->
+<div class="page" id="page-creator" hidden>
+  <div class="ghost" data-depth="0.2" style="top:100vh" aria-hidden="true">Brat</div>
+  <div class="ghost" data-depth="-0.1" style="top:260vh;left:14vw" aria-hidden="true">Maker</div>
+  <section class="hero stage-point">
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="eyebrow">The creator</p>
+        <h1 class="mega name"><span>Daksh</span><span class="v">Masulkar</span></h1>
+        <div class="tags"><span class="tag hot">18</span><span class="tag">Vibe coder</span><span class="tag">UI/UX designer</span><span class="tag">Innovative brat</span></div>
+        <p class="lead">Eighteen years old and already building what most people are still sketching. StudyMind AI is his hackathon entry.</p>
+      </div>
+      <div class="robot-slot hero-slot"></div>
+    </div>
+  </section>
+ 
+  <section class="sec" style="padding-top:20px">
+    <div class="wrap">
+      <div class="panel rv">
+        <p class="eyebrow">Spec sheet</p>
+        <dl class="dl">
+          <dt>Name</dt><dd>Daksh Masulkar</dd>
+          <dt>Age</dt><dd>18</dd>
+          <dt>Role</dt><dd>Vibe coder · UI/UX designer</dd>
+          <dt>Energy</dt><dd>Innovative brat</dd>
+          <dt>Mind</dt><dd>Intelligent</dd>
+          <dt>Project</dt><dd>StudyMind AI</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+ 
+  <section class="sec">
+    <div class="wrap praises">
+      <span class="praise drift rv" data-dx="0.06">Eighteen. <em>Zero patience</em> for average.</span>
+      <span class="praise alt drift rv" data-dx="-0.06" style="margin-left:auto;text-align:right">Designs like a studio. <em>Ships like a startup.</em></span>
+      <span class="praise drift rv" data-dx="0.06">Sees the whole product <em>before the first pixel.</em></span>
+    </div>
+  </section>
+ 
+  <section class="interlude stage-point cap-right">
+    <div class="wrap iw">
+      <div class="robot-slot"></div>
+      <div class="speech panel rv"><span class="tag hot">PROF. BYTE</span><p>Taught by robots. Designed by Daksh.</p></div>
+    </div>
+  </section>
+ 
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head rv"><p class="eyebrow">Superpowers</p><h2>What makes him dangerous.</h2></div>
+      <div class="g4" id="traits"></div>
+      <div class="row rv" style="margin-top:36px">
+        <a class="btn" href="#features">See what he built &rarr;</a>
+        <a class="btn ghost" href="#home">Back to start</a>
+      </div>
+    </div>
+  </section>
+</div>
+</main>
+ 
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="#home" data-nav="home"><i></i>StudyMind AI</a>
+      <p style="margin-top:12px">A hackathon project by Daksh Masulkar.</p>
+      <p>Backgrounds and robots render live in your browser.</p>
+    </div>
+    <nav class="foot-nav" aria-label="Footer">
+      <a href="#home" data-nav="home">Home</a><a href="#features" data-nav="features">Features</a><a href="#tech" data-nav="tech">Under the hood</a><a href="#build" data-nav="build">Build</a><a href="#creator" data-nav="creator">Creator</a>
+    </nav>
+  </div>
+</footer>
+ 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var PAGES=['home','features','tech','build','creator'];
+document.documentElement.classList.add('js');
+ 
+/* ---------- content ---------- */
+var MODULES=[
+ {id:'mod-dashboard',tag:'Module · Dashboard',title:'Your day on one screen',sum:'A personal home that shows what to study next and how the week is going.',
+  items:['Greeting and user profile','Daily study goal and progress','Continue studying','Recently opened notes and documents','Upcoming deadlines and reminders','Study streak and weekly activity','Quick actions: Upload Notes, Ask AI, Generate Quiz, Create Flashcards','Revision topics recommended from your own study history','Clear AI usage-limit indicator'],
+  rule:'Demo mode uses sample content and labels it, so demo data never passes for real data.',extra:'dash'},
+ {id:'mod-chat',tag:'Module · AI chat',title:'Answers that know their limits',sum:'Ask in plain language and choose how deep the explanation goes.',
+  items:['Natural-language academic questions','Beginner, Intermediate and Advanced levels','Step-by-step explanations','Examples, analogies, definitions and summaries','Follow-up questions on request','Questions grounded in uploaded documents','Citations and page references for document answers','Copy and save useful answers','Regenerate a response or stop it mid-way','Helpful messages when the AI service is down'],
+  rule:'It admits uncertainty, never invents citations, and separates source-based answers from general knowledge. With no API credentials you get a labelled demo mode and setup steps, never fake model output.',extra:'level'},
+ {id:'mod-docs',tag:'Module · Documents',title:'Your notes, readable by AI',sum:'A library for study material with extraction, summaries and Q&A.',
+  items:['Upload PDF, TXT and DOCX files','Folders, rename, search and delete','Text extraction from supported files','Summaries and key-point lists','Chapter-wise revision notes','Questions generated from selected material','Ask questions about one document','Jump to relevant pages or passages','Upload progress and processing status','Errors for unsupported files and clear empty states'],
+  rule:'File type and size limits are validated, files are processed securely, and private document URLs are never exposed.'},
+ {id:'mod-quiz',tag:'Module · Quizzes',title:'Test yourself on your own material',sum:'A full quiz flow from setup to review.',
+  items:['Topic or document selection','Multiple-choice, true/false and short-answer questions','Adjustable difficulty and question count','Timed and untimed modes','Answer explanations','Score calculation','Review of incorrect answers and retry of just those','Quiz history and progress tracking'],
+  rule:'Questions come from the material you pick. No fabricated scores, and no claim that a quiz is a scientifically validated assessment.'},
+ {id:'mod-cards',tag:'Module · Flashcards',title:'Cards that come back at the right time',sum:'Generated from notes or written by hand, scheduled by how well you recall them.',
+  items:['Automatic flashcard generation from notes','Front and back views with flip animation','Manual creation and editing','Decks organised by subject','Rate each card Again, Hard, Good or Easy','Simple spaced-repetition scheduling','Daily review goals','Progress tracking and due-card counts'],
+  rule:'User-created cards and their review progress are stored persistently.',extra:'flip'},
+ {id:'mod-planner',tag:'Module · Planner',title:'Plan it, focus, repeat',sum:'Study plans, a calendar and a timer in one place.',
+  items:['Subject-wise study plans','Calendar and daily task list','Study sessions with custom durations','Break reminders and a Pomodoro timer','Task completion tracking','Deadline reminders','Weekly productivity summaries','Optional notification settings'],
+  rule:'Timers work reliably wherever the platform allows. Background-execution and notification limits are explained to the user.',extra:'pomo'},
+ {id:'mod-analytics',tag:'Module · Analytics',title:'Progress you can trust',sum:'Charts built from what you actually did.',
+  items:['Study time by day and week','Completed study sessions','Quiz scores over time','Flashcards reviewed','Subject-wise progress','Study streaks','Personal learning goals'],
+  rule:'Every figure is calculated from real stored events. Estimates are labelled, and new users see useful empty states.'},
+ {id:'mod-search',tag:'Module · Search and profile',title:'Find anything, tune everything',sum:'Global search plus the settings that make the app yours.',
+  items:['Global search across notes, flashcards, quizzes and saved AI answers','Editable profile and preferred subjects','Explanation difficulty preference and study goals','Dark and light theme selection','Language preferences where supported','Configurable reminders','Data export and account deletion'],
+  rule:'Personal study data is used for personalization only with consent and controls.'}
+];
+var EXTRAS={
+ dash:function(){return '<div class="widget"><span class="wl">Layout wireframe · no data shown</span><div class="wire"><div class="s6">Greeting · profile</div><div class="s2">Daily goal</div><div class="s2">Study streak</div><div class="s2">AI usage limit</div><div class="s6">Continue studying</div><div class="s3">Recent notes and documents</div><div class="s3">Deadlines and reminders</div><div class="s3">Recommended revision</div><div class="s3">Weekly activity</div><div class="s2 qa">Upload Notes</div><div class="s2 qa">Ask AI</div><div class="s1 qa">Quiz</div><div class="s1 qa">Cards</div></div></div>'},
+ level:function(){return '<div class="widget"><span class="wl">Explanation levels · what each is designed to do</span><div class="seg" role="group" aria-label="Explanation level"><button type="button" data-lv="b" aria-pressed="true">Beginner</button><button type="button" data-lv="i" aria-pressed="false">Intermediate</button><button type="button" data-lv="a" aria-pressed="false">Advanced</button></div><p class="lvtext" id="lvtext" aria-live="polite"></p></div>'},
+ flip:function(){return '<div class="widget"><span class="wl">Sample card · tap to flip</span><button type="button" class="flip" aria-pressed="false" aria-label="Sample flashcard. Press to flip."><span class="flip-in"><span class="face"><small>Front</small>What does a spaced-repetition scheduler decide?</span><span class="face back"><small>Back</small>When you see a card again, based on how well you recalled it.</span></span></button><div class="rate" role="group" aria-label="Rate the card"><button type="button">Again</button><button type="button">Hard</button><button type="button">Good</button><button type="button">Easy</button></div><p class="note" id="rateMsg" aria-live="polite">Sample card written for this site.</p></div>'},
+ pomo:function(){return '<div class="widget"><span class="wl">Live demo · Pomodoro timer</span><div class="pomo-time" id="pomoTime" role="timer">25:00</div><div class="row" style="gap:12px"><div class="seg" role="group" aria-label="Session length in minutes"><button type="button" data-m="15" aria-pressed="false">15 min</button><button type="button" data-m="25" aria-pressed="true">25 min</button><button type="button" data-m="50" aria-pressed="false">50 min</button></div><button type="button" class="btn sm" id="pomoGo">Start</button><button type="button" class="btn sm ghost" id="pomoReset">Reset</button></div><p class="note" id="pomoMsg" aria-live="polite">Runs while this tab is open. The app explains platform limits on background timers.</p></div>'}
+};
+var LEVELS={b:'Plain words, small steps and everyday analogies. Jargon is explained the first time it appears.',i:'Standard terminology with worked examples. Assumes you know the basics of the subject.',a:'Full rigor, edge cases and stated assumptions. Skips the hand-holding.'};
+var INTERLUDES={
+ 3:'<section class="interlude stage-point cap-right"><div class="wrap iw"><div class="robot-slot"></div><div class="speech panel rv"><span class="tag hot">QUIZ-O</span><p>Wrong answers are the useful ones. Review them, then retry just those.</p></div></div></section>',
+ 5:'<section class="interlude stage-point cap-left"><div class="wrap iw"><div class="robot-slot"></div><div class="speech panel rv"><span class="tag hot">TIMER-X</span><p>Focus, break, repeat. Reminders follow the settings you choose.</p></div></div></section>'
+};
+var SECURITY=[['Keys stay on the server','Private AI API keys and secrets never ship inside the app.'],['Protected AI backend','Every AI request goes through an authenticated server route.'],['Server-side validation','Requests are validated and authorized on the server, never trusted from the client.'],['Rate limits and quotas','Reasonable usage limits protect the service and the person using it.'],['File validation','Type and size limits are enforced on every upload.'],['Ownership checks','A document is reachable only by the account that owns it.'],['Encrypted connections','All traffic travels over encrypted connections.'],['Quiet logging','Passwords, private documents and sensitive prompts are not logged without need.'],['Secure credential storage','Credentials use platform-secure storage, with proper sessions and logout.'],['Least privilege','Each component gets only the access it needs.'],['Untrusted documents','Uploaded text is untrusted input. Instructions hidden in a file cannot override app rules.'],['Privacy and deletion','Privacy notice, data export, account deletion, and no sensitive content kept longer than needed.']];
+var PERF=['Lazy-loaded lists and document content','Local caching of suitable data','Debounced search','Paginated large result sets','Fewer unnecessary re-renders','Compressed or resized images','Background processing for heavy document work','Retry controls for network failures','Graceful offline states','Meaningful loading and progress feedback','An interface that never freezes during AI or document work'];
+var A11Y=['Readable font sizes','Accessible contrast','Keyboard navigation on Windows','Touch-friendly controls on Android','Screen-reader labels','Clear focus indicators','Reduced-motion preferences','Helpful validation messages','Confirmation before destructive actions'];
+var STACK=[['Android','React Native with Expo. Bottom navigation bar and touch-first controls.'],['Windows','A shared React interface (Expo web) packaged in a desktop shell. Sidebar, keyboard and mouse.'],['Backend','A protected API for AI requests, accounts and protected data. Private AI keys live only here.'],['Data','SQLite on the device for offline data and caching. A hosted database for synced accounts and study content.']];
+var SW_DARK=[['Midnight Navy','#111827','Background'],['Deep Slate','#1F2937','Surfaces'],['Electric Violet','#8B5CF6','Primary accent'],['Cyan','#22D3EE','Secondary accent'],['Main text','#F9FAFB','Text'],['Secondary text','#9CA3AF','Text'],['Success','#34D399','State'],['Warning','#FBBF24','State'],['Error','#F87171','State']];
+var SW_LIGHT=[['Background','#F8FAFC','Page'],['Cards','#FFFFFF','Surfaces'],['Primary accent','#7C3AED','Primary'],['Secondary accent','#0891B2','Secondary'],['Main text','#0F172A','Text'],['Secondary text','#475569','Text']];
+var STAGES=['Define the architecture and shared design system','Build navigation and responsive layouts','Add local persistence and core study features','Integrate the AI backend','Implement authentication and security controls','Add document processing and source citations','Test on Android and Windows','Fix functional, visual and accessibility defects','Write setup instructions, environment-variable examples and deployment docs'];
+var SCREENS=['Welcome and onboarding','Sign in and registration','Dashboard','AI chat','Document library','Document reader and summary','Quiz generator','Quiz-taking and results','Flashcard decks and review','Study planner and focus timer','Analytics','Search','Profile and settings','Privacy and data controls'];
+var DELIVER=['Complete source code','Project folder structure','README with setup instructions','Dependency installation commands','Environment-variable example with no real secrets','Backend setup and database schema','Android build instructions','Windows build and packaging instructions','Test cases and results','Screenshots of the main screens','Implemented features and known limitations','Roadmap for future improvements'];
+var LIMITS=['Demo mode is labelled whenever API credentials are missing.','Platform limits on timers and notifications are explained to users.','No claim of being breach-proof. Remaining risks are documented.','Unfinished features are never marked as complete.','A reliable MVP comes before a long feature list.'];
+var TRAITS=[['Vibe coder','Turns an idea into running software at the speed of thought.'],['UI/UX designer','Obsessed with spacing, hierarchy and how every tap feels.'],['Innovative brat','Rejects the default template and asks why not.'],['Intelligent','Reads a sixteen-section brief and plans the whole architecture first.']];
+var TEASERS=[['Dashboard','Goals, streaks and what to study next.'],['AI chat','Three explanation levels and cited answers.'],['Documents','PDF, TXT and DOCX with summaries and Q&A.'],['Quizzes','Three question types, timed or relaxed.'],['Flashcards','Spaced repetition with four ratings.'],['Planner','Pomodoro, tasks and deadline reminders.'],['Analytics','Charts from real stored events.'],['Search','One search across everything you saved.']];
+var MARQUEE=['Dashboard','AI chat','Document library','Quiz generator','Flashcards','Study planner','Focus timer','Analytics','Global search','Android','Windows'];
+ 
+/* ---------- render ---------- */
+function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+function cardList(id,arr){var el=$(id);if(!el)return;el.innerHTML=arr.map(function(a,i){return '<div class="card rv" style="--d:'+((i%4)*.06)+'s"><h3>'+esc(a[0])+'</h3><p>'+esc(a[1])+'</p></div>'}).join('')}
+function chipList(id,arr){var el=$(id);if(!el)return;el.innerHTML=arr.map(function(a,i){return '<li class="rv" style="--d:'+((i%3)*.05)+'s">'+esc(a)+'</li>'}).join('')}
+function swatches(id,arr){$(id).innerHTML=arr.map(function(a){return '<div class="sw rv"><i style="background:'+a[1]+'"></i><div><b>'+esc(a[0])+'</b><span>'+a[1]+' · '+esc(a[2])+'</span></div></div>'}).join('')}
+function renderAll(){
+  $('#marquee').innerHTML=MARQUEE.concat(MARQUEE).concat(MARQUEE).concat(MARQUEE).map(function(m){return '<span>'+m+'</span>'}).join('');
+  $('#teasers').innerHTML=TEASERS.map(function(t,i){return '<a class="card rv" style="--d:'+((i%4)*.06)+'s;text-decoration:none;display:block" href="#features"><h3>'+esc(t[0])+'</h3><p>'+esc(t[1])+'</p></a>'}).join('');
+  /* features page: three groups of modules, robot interludes between them */
+  var idx='<nav class="index" aria-label="Modules">'+MODULES.map(function(m){return '<a href="#features" data-jump="'+m.id+'">'+esc(m.tag.split(' · ')[1])+'</a>'}).join('')+'</nav>';
+  function modHtml(m){return '<article class="mod panel rv" id="'+m.id+'"><span class="tag hot">'+esc(m.tag)+'</span><h2 style="margin-top:1rem">'+esc(m.title)+'</h2><p class="sum">'+esc(m.sum)+'</p><ul class="fl">'+m.items.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'+(m.extra?EXTRAS[m.extra]():'')+'<div class="rule"><span class="tag">Guardrail</span><p>'+esc(m.rule)+'</p></div></article>'}
+  var out='';
+  [[0,3],[4,5],[6,7]].forEach(function(g){
+    var inner='';for(var i=g[0];i<=g[1];i++)inner+=modHtml(MODULES[i]);
+    out+='<section class="sec" style="padding-top:20px"><div class="wrap feat">'+idx+'<div class="mods">'+inner+'</div></div></section>';
+    if(INTERLUDES[g[1]])out+=INTERLUDES[g[1]];
+  });
+  $('#featBody').innerHTML=out;
+  cardList('#stack',STACK);cardList('#security',SECURITY);chipList('#perf',PERF);chipList('#a11y',A11Y);
+  swatches('#sw-dark',SW_DARK);swatches('#sw-light',SW_LIGHT);
+  $('#stages').innerHTML=STAGES.map(function(s,i){return '<li class="rv"><small>Stage '+(i+1)+'</small>'+esc(s)+'</li>'}).join('');
+  $('#screens').innerHTML=SCREENS.map(function(s,i){return '<div class="card rv" style="--d:'+((i%4)*.05)+'s"><h3 style="margin:0;font-size:.92rem">'+esc(s)+'</h3></div>'}).join('');
+  chipList('#deliver',DELIVER);
+  $('#limits').innerHTML=LIMITS.map(function(l){return '<li>'+esc(l)+'</li>'}).join('');
+  cardList('#traits',TRAITS);
+}
+ 
+/* ---------- widgets ---------- */
+function initWidgets(){
+  var lv=$('#lvtext');
+  if(lv){lv.textContent=LEVELS.b;$$('[data-lv]').forEach(function(b){b.addEventListener('click',function(){$$('[data-lv]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});lv.textContent=LEVELS[b.dataset.lv]})})}
+  var fl=$('.flip');
+  if(fl){fl.addEventListener('click',function(){fl.setAttribute('aria-pressed',String(fl.getAttribute('aria-pressed')!=='true'))});
+    $$('.rate button').forEach(function(b){b.addEventListener('click',function(){fl.setAttribute('aria-pressed','false');$('#rateMsg').textContent='Rated "'+b.textContent+'". In the app, this sets when the card comes back.'})})}
+  var out=$('#pomoTime');
+  if(out){
+    var go=$('#pomoGo'),rs=$('#pomoReset'),msg=$('#pomoMsg'),mins=25,left=1500,run=false,end=0,iv=null;
+    var fmt=function(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+    var draw=function(){out.textContent=fmt(left)};
+    var stop=function(){run=false;clearInterval(iv);go.textContent='Start'};
+    var tick=function(){left=Math.max(0,Math.round((end-Date.now())/1000));draw();if(left<=0){stop();msg.textContent='Focus block done. The app would fire a break reminder here.'}};
+    go.addEventListener('click',function(){
+      if(run){left=Math.max(0,Math.round((end-Date.now())/1000));stop();draw();msg.textContent='Paused.';return}
+      if(left<=0)left=mins*60;end=Date.now()+left*1000;run=true;go.textContent='Pause';msg.textContent='Focus mode. One thing at a time.';iv=setInterval(tick,250);
+    });
+    rs.addEventListener('click',function(){stop();left=mins*60;draw();msg.textContent='Reset.'});
+    $$('[data-m]').forEach(function(b){b.addEventListener('click',function(){mins=+b.dataset.m;$$('[data-m]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});stop();left=mins*60;draw();msg.textContent=''})});
+  }
+}
+ 
+/* ---------- router + scroll plumbing ---------- */
+var current='home',ANCH={S:[0],fy:[.5]};
+function pageFromHash(){var h=location.hash.replace('#','').toLowerCase();return PAGES.indexOf(h)>-1?h:'home'}
+function computeAnchors(){
+  var pts=$$('.stage-point',$('#page-'+current)),vh=innerHeight,sy=window.scrollY,narrow=innerWidth<=900,S=[],fy=[];
+  pts.forEach(function(el){
+    var r=el.getBoundingClientRect(),c=r.top+sy+r.height/2,s=Math.max(0,c-vh/2);S.push(s);
+    var slot=narrow?el.querySelector('.robot-slot'):null,y=.5;
+    if(slot){var sr=slot.getBoundingClientRect();if(sr.height>0)y=(sr.top+sy+sr.height/2-s)/vh}
+    fy.push(Math.max(.12,Math.min(.88,y)));
+  });
+  ANCH={S:S,fy:fy};
+}
+var ghosts=[],drifts=[],vis=new Set(),lastSy=-1;
+function collect(){
+  var pg=$('#page-'+current);
+  ghosts=$$('.ghost',pg).map(function(e){return {el:e,d:parseFloat(e.dataset.depth)||0}});
+  drifts=$$('.drift',pg).map(function(e){return {el:e,dx:parseFloat(e.dataset.dx)||0}});
+}
+var ioReveal=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');ioReveal.unobserve(e.target)}})},{rootMargin:'0px 0px -6% 0px',threshold:.05});
+var ioPanel=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)vis.add(e.target);else{vis.delete(e.target);e.target.style.setProperty('--sx','0deg')}})},{rootMargin:'10% 0px'});
+function observeAll(){$$('.rv:not(.in)').forEach(function(e){ioReveal.observe(e)});$$('.panel').forEach(function(e){ioPanel.observe(e)})}
+function show(name,first){
+  PAGES.forEach(function(p){$('#page-'+p).hidden=p!==name});
+  $$('[data-nav]').forEach(function(a){if(a.dataset.nav===name)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  current=name;window.scrollTo(0,0);lastSy=-1;
+  collect();computeAnchors();world.go(PAGES.indexOf(name),first);
+  var act=$('#main');if(!first){/* focus management for keyboard users */act.setAttribute('tabindex','-1');act.focus({preventScroll:true})}
+}
+function relayout(){computeAnchors();world.layout();world.resize();lastSy=-1;if(reduce)world.render()}
+function debounce(f,ms){var t;return function(){clearTimeout(t);t=setTimeout(f,ms)}}
+ 
+/* ---------- 3D world ---------- */
+var world=(function(){
+  var canvas=$('#world'),R,S,C,ok=false,STAGE=170,stage=0,camZ=0,mx=0,my=0,tmx=0,tmy=0,last=0,tt=0,focus=10,groups=[],robots=[],shapes=[],rings=[],gridA,gridB;
+  var CFG=[
+    [{v:'cap',c:0x8B5CF6},{v:'cards',c:0x22D3EE},{v:'qmark',c:0x8B5CF6}],
+    [{v:'book',c:0x22D3EE},{v:'qmark',c:0x22D3EE},{v:'clock',c:0x8B5CF6}],
+    [{v:'stack',c:0x22D3EE},{v:'shield',c:0x8B5CF6}],
+    [{v:'hardhat',c:0x8B5CF6},{v:'cap',c:0x22D3EE}],
+    [{v:'crown',c:0xFBBF24},{v:'cap',c:0x8B5CF6}]
+  ];
+  var geo,edgeGeo,mats={};
+  function std(c,x){var k=c+JSON.stringify(x||{});return mats[k]||(mats[k]=new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.5,metalness:.3,flatShading:true},x||{})))}
+  function glowM(c){var k='g'+c;return mats[k]||(mats[k]=new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:1,roughness:.4}))}
+  function holoM(c){var k='h'+c;return mats[k]||(mats[k]=new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}))}
+  function lineM(c){var k='l'+c;return mats[k]||(mats[k]=new THREE.LineBasicMaterial({color:c}))}
+  function put(par,g,m,s,p,edge,rot){
+    var o=new THREE.Mesh(geo[g],m);o.scale.set(s[0],s[1],s[2]);o.position.set(p[0],p[1],p[2]);if(rot)o.rotation.set(rot[0],rot[1],rot[2]);par.add(o);
+    if(edge&&edgeGeo[g]){var e=new THREE.LineSegments(edgeGeo[g],lineM(edge));e.scale.copy(o.scale);e.position.copy(o.position);if(rot)e.rotation.set(rot[0],rot[1],rot[2]);par.add(e)}
+    return o;
+  }
+  function buildRobot(cfg){
+    var c=cfg.c,root=new THREE.Group(),body=new THREE.Group();root.add(body);
+    var shell=std(0xE5E7EB),dark=std(0x1F2937,{metalness:.5}),glow=glowM(c),gold=std(0xFBBF24,{emissive:0x7a5a00,emissiveIntensity:.5});
+    put(body,'box',shell,[1.5,1.7,1],[0,0,0],c);
+    put(body,'box',dark,[1,.7,.06],[0,.15,.52]);put(body,'box',glow,[.6,.1,.04],[0,.15,.56]);
+    put(body,'box',glow,[.14,.14,.04],[-.3,-.35,.52]);put(body,'box',glow,[.14,.14,.04],[.3,-.35,.52]);
+    put(body,'cyl',dark,[.45,.25,.45],[0,.95,0]);put(body,'cyl',dark,[.9,.35,.9],[0,-1.2,0]);
+    var ring=put(body,'tor',glow,[1.6,1.6,1.6],[0,-1.45,0]);ring.rotation.x=Math.PI/2;
+    var head=new THREE.Group();head.position.y=1.6;body.add(head);
+    put(head,'box',shell,[1.35,1.05,1.15],[0,0,0],c);put(head,'box',dark,[1.1,.5,.06],[0,.05,.6]);
+    put(head,'box',glow,[.26,.2,.04],[-.28,.06,.64]);put(head,'box',glow,[.26,.2,.04],[.28,.06,.64]);put(head,'box',glow,[.36,.05,.04],[0,-.3,.6]);
+    put(head,'box',dark,[.14,.4,.4],[-.74,0,0]);put(head,'box',dark,[.14,.4,.4],[.74,0,0]);
+    put(head,'cyl',dark,[.07,.55,.07],[0,.8,0]);put(head,'sph',glow,[.22,.22,.22],[0,1.12,0]);
+    function arm(x){var g=new THREE.Group();g.position.set(x,.5,0);body.add(g);put(g,'box',shell,[.34,.95,.34],[0,-.5,0],c);put(g,'sph',dark,[.42,.42,.42],[0,-1.05,0]);return g}
+    var armL=arm(-1),armR=arm(1);armL.rotation.z=-.25;
+    var acc=new THREE.Group(),spin=null,hand=null,v=cfg.v;
+    body.add(acc);
+    if(v==='cap'){
+      put(head,'box',dark,[1.05,.28,1.05],[0,.62,0]);var b=put(head,'box',dark,[1.9,.07,1.9],[0,.8,0],c);b.rotation.y=Math.PI/4;
+      put(head,'sph',glow,[.14,.14,.14],[0,.88,0]);put(head,'box',gold,[.05,.5,.05],[1.25,.55,0]);put(head,'sph',gold,[.14,.14,.14],[1.25,.28,0]);
+      acc.position.set(-1.9,.3,.9);put(acc,'box',holoM(c),[.9,.05,.65],[-.45,0,0],c,[0,0,.25]);put(acc,'box',holoM(c),[.9,.05,.65],[.45,0,0],c,[0,0,-.25]);
+    }
+    if(v==='book'){acc.position.set(-1.9,.3,.9);put(acc,'box',holoM(c),[.9,.05,.65],[-.45,0,0],c,[0,0,.25]);put(acc,'box',holoM(c),[.9,.05,.65],[.45,0,0],c,[0,0,-.25])}
+    if(v==='cards'){acc.position.set(1.9,.6,.8);spin=acc;for(var i=-1;i<=1;i++)put(acc,'box',holoM(c),[.6,.85,.03],[i*.35,0,-i*.02],c,[0,0,-i*.3])}
+    if(v==='qmark'){acc.position.set(1.9,.9,.7);spin=acc;var arc=new THREE.Mesh(new THREE.TorusGeometry(.4,.1,8,24,Math.PI*1.5),glow);arc.scale.x=-1;arc.position.y=.3;acc.add(arc);put(acc,'cyl',glow,[.2,.3,.2],[0,-.32,0]);put(acc,'sph',glow,[.22,.22,.22],[0,-.72,0])}
+    if(v==='clock'){acc.position.set(1.9,.7,.8);put(acc,'tor',glow,[1,1,1],[0,0,0]);put(acc,'circ',holoM(c),[1,1,1],[0,0,0]);hand=new THREE.Group();acc.add(hand);put(hand,'box',glow,[.06,.4,.03],[0,.2,.02]);var h2=new THREE.Group();acc.add(h2);put(h2,'box',glow,[.06,.26,.03],[0,.13,.02]);h2.rotation.z=-1.2}
+    if(v==='shield'){acc.position.set(1.9,.7,.8);put(acc,'hex',holoM(c),[1.4,.1,1.6],[0,0,0],c,[Math.PI/2,0,0]);put(acc,'box',glow,[.1,.35,.04],[-.2,-.08,.08],null,[0,0,.8]);put(acc,'box',glow,[.1,.7,.04],[.12,.05,.08],null,[0,0,-.6]);spin=acc}
+    if(v==='stack'){acc.position.set(1.9,.5,.8);spin=acc;for(var j=-1;j<=1;j++)put(acc,'box',holoM(c),[1.2,.14,.9],[0,j*.34,0],c)}
+    if(v==='hardhat'){put(head,'dome',gold,[1.5,1.3,1.5],[0,.52,0]);put(head,'box',gold,[1.7,.07,1.4],[0,.52,.1]);acc.position.set(1.9,.7,.8);put(acc,'box',holoM(c),[1.3,.9,.03],[0,0,0],c);put(acc,'box',glow,[.9,.04,.04],[0,.2,.03]);put(acc,'box',glow,[.6,.04,.04],[-.15,-.05,.03]);put(acc,'box',glow,[.8,.04,.04],[-.05,-.28,.03])}
+    if(v==='crown'){put(head,'cyl',gold,[.95,.18,.95],[0,.62,0]);for(var k=0;k<5;k++){var a=k/5*Math.PI*2;put(head,'cone',gold,[.24,.5,.24],[Math.cos(a)*.38,.92,Math.sin(a)*.38])}put(head,'box',dark,[1.15,.26,.08],[0,.08,.66],c)}
+    root.userData={head:head,armR:armR,armL:armL,body:body,ring:ring,acc:acc,spin:spin,hand:hand,v:v};
+    return root;
+  }
+  function init(){
+    if(!window.THREE)return false;
+    try{R=new THREE.WebGLRenderer({canvas:canvas,antialias:innerWidth>900})}catch(e){return false}
+    R.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));R.setClearColor(0x111827,1);
+    S=new THREE.Scene();S.fog=new THREE.Fog(0x111827,22,115);
+    C=new THREE.PerspectiveCamera(58,1,.1,260);S.add(C);
+    S.add(new THREE.AmbientLight(0xffffff,.7));
+    var dl=new THREE.DirectionalLight(0xc4b5fd,.9);dl.position.set(4,9,8);S.add(dl);
+    var pl=new THREE.PointLight(0x22d3ee,1,45);pl.position.set(0,2,4);C.add(pl);
+    geo={box:new THREE.BoxGeometry(1,1,1),cyl:new THREE.CylinderGeometry(.5,.5,1,20),hex:new THREE.CylinderGeometry(.5,.5,1,6),sph:new THREE.SphereGeometry(.5,18,14),cone:new THREE.ConeGeometry(.5,1,4),tor:new THREE.TorusGeometry(.5,.05,8,36),dome:new THREE.SphereGeometry(.5,18,8,0,Math.PI*2,0,Math.PI/2),circ:new THREE.CircleGeometry(.5,32)};
+    edgeGeo={box:new THREE.EdgesGeometry(geo.box),hex:new THREE.EdgesGeometry(geo.hex),cyl:new THREE.EdgesGeometry(geo.cyl)};
+    gridA=new THREE.GridHelper(240,40,0x22d3ee,0x3b3070);gridA.position.y=-7;S.add(gridA);
+    gridB=new THREE.GridHelper(240,40,0x8b5cf6,0x1f2a44);gridB.position.y=13;S.add(gridB);
+    /* star field */
+    var N=2600,pos=new Float32Array(N*3),col=new Float32Array(N*3),pal=[[1,1,1],[.13,.83,.93],[.55,.36,.96]];
+    for(var i=0;i<N;i++){pos[i*3]=(Math.random()-.5)*90;pos[i*3+1]=(Math.random()-.5)*34;pos[i*3+2]=40-Math.random()*(STAGE*5+80);var p=pal[(Math.random()*3)|0];col[i*3]=p[0];col[i*3+1]=p[1];col[i*3+2]=p[2]}
+    var g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    S.add(new THREE.Points(g,new THREE.PointsMaterial({size:.16,vertexColors:true,transparent:true,opacity:.9})));
+    /* floating wireframes */
+    var sg=[new THREE.IcosahedronGeometry(1,0),new THREE.OctahedronGeometry(1,0),new THREE.BoxGeometry(1.4,1.4,1.4),new THREE.TetrahedronGeometry(1.2,0)];
+    for(var n=0;n<80;n++){var gg=sg[n%4],m=new THREE.LineSegments(new THREE.EdgesGeometry(gg),lineM(n%2?0x8B5CF6:0x22D3EE));var sc=.8+Math.random()*2.2;m.scale.setScalar(sc);m.position.set((Math.random()<.5?-1:1)*(9+Math.random()*26),(Math.random()-.5)*22,30-Math.random()*(STAGE*5+60));m.userData={rx:(Math.random()-.5)*.6,ry:(Math.random()-.5)*.6};S.add(m);shapes.push(m)}
+    /* portal rings */
+    for(var z=-30;z>-(STAGE*5+60);z-=60){var rg=new THREE.Mesh(new THREE.TorusGeometry(14,.06,6,72),new THREE.MeshBasicMaterial({color:(Math.abs(z)/60)%2?0x22D3EE:0x8B5CF6}));rg.scale.y=.8;rg.position.set(0,3,z);S.add(rg);rings.push(rg)}
+    /* robots */
+    CFG.forEach(function(list,si){var grp=new THREE.Group();S.add(grp);groups.push(grp);list.forEach(function(cf,k){var r=buildRobot(cf);r.position.set(k%2===0?4.6:-4.6,-1,robotZ(si,k));r.scale.setScalar(1.2);r.rotation.y=k%2===0?-.45:.45;r.userData.k=k;r.userData.ph=Math.random()*6;r.userData.side=k%2===0?1:-1;grp.add(r);robots.push({g:r,stage:si,k:k,by:-1})})});
+    ok=true;resize();
+    window.addEventListener('pointermove',function(e){tmx=(e.clientX/innerWidth-.5)*2;tmy=-(e.clientY/innerHeight-.5)*2},{passive:true});
+    return true;
+  }
+  function robotZ(si,k){return -si*STAGE-20-k*45}
+  function resize(){if(!ok)return;R.setSize(innerWidth,innerHeight,false);C.aspect=innerWidth/innerHeight;C.updateProjectionMatrix()}
+  function layout(){
+    if(!ok)return;
+    var narrow=innerWidth<=900,asp=innerWidth/innerHeight;focus=narrow?15:10;
+    var halfH=focus*Math.tan(THREE.MathUtils.degToRad(29)),halfW=halfH*asp;
+    robots.forEach(function(r){
+      if(r.stage!==stage)return;
+      var side=r.k%2===0?1:-1,sc=narrow?1.35:1.2,fy=narrow?(ANCH.fy[r.k]!==undefined?ANCH.fy[r.k]:.5):.5;
+      r.g.scale.setScalar(sc);r.g.position.x=narrow?0:side*Math.min(4.6,halfW*.46);
+      r.by=(0.5-fy)*2*halfH-.7*sc;r.g.position.y=r.by;r.g.rotation.y=narrow?0:-side*.45;
+    });
+  }
+  function camTarget(sy){
+    var Sx=ANCH.S,n=Sx.length;
+    function zf(k){return robotZ(stage,k)+focus}
+    if(!n)return zf(0);
+    if(sy<=Sx[0])return zf(0);
+    for(var k=0;k<n-1;k++){if(sy<=Sx[k+1]){var t=(sy-Sx[k])/Math.max(1,Sx[k+1]-Sx[k]);t=t*t*(3-2*t);return zf(k)+(zf(k+1)-zf(k))*t}}
+    return zf(n-1)-Math.min(6,(sy-Sx[n-1])/220);
+  }
+  function go(i,first){stage=i;layout();if(ok&&first){camZ=camTarget(window.scrollY);if(reduce)render()}}
+  function render(){frame(performance.now(),true)}
+  function updRobot(r,t){
+    var u=r.g.userData,ph=u.ph;
+    u.body.position.y=Math.sin(t*1.4+ph)*.16;u.ring.scale.setScalar(1.6+Math.sin(t*3+ph)*.08);
+    u.head.rotation.y=mx*.35;u.head.rotation.x=-my*.18;
+    var wave=(u.k===0);
+    u.armR.rotation.z=wave?2.4+Math.sin(t*3.2+ph)*.28:.9+Math.sin(t*1.6+ph)*.08;
+    u.armL.rotation.z=-.25-Math.sin(t*1.5+ph)*.05;
+    if(u.spin)u.spin.rotation.y=t*.7;
+    if(u.hand)u.hand.rotation.z=-t*1.2;
+    if(u.v==='book'||u.v==='cap')u.acc.position.y=.3+Math.sin(t*1.8+ph)*.12;
+  }
+  function frame(ts,force){
+    if(!ok)return;
+    var dt=Math.min(.05,Math.max(.001,(ts-last)/1000));last=ts;if(!reduce)tt+=dt;
+    var target=camTarget(window.scrollY),dz=target-camZ,k=1-Math.exp(-dt*(reduce?80:4.5));
+    var step=dz*k,cap=900*dt;if(!reduce){if(step>cap)step=cap;if(step<-cap)step=-cap}
+    camZ+=step;
+    var kv=1-Math.exp(-dt*6);mx+=(tmx-mx)*kv;my+=(tmy-my)*kv;
+    var fovT=reduce?58:58+Math.min(20,Math.abs(step)/Math.max(dt,.001)*.025);
+    if(Math.abs(C.fov-fovT)>.05){C.fov+=(fovT-C.fov)*Math.min(1,dt*8);C.updateProjectionMatrix()}
+    C.position.set(mx*1.3,my*.8,camZ);C.lookAt(mx*.8,my*.4,camZ-30);
+    var off=reduce?0:(tt*2.6)%6;
+    gridA.position.z=Math.round(camZ/6)*6+off;gridB.position.z=gridA.position.z;
+    var sf=-camZ/STAGE;
+    groups.forEach(function(g,i){g.visible=Math.abs(sf-i)<1.4});
+    if(!reduce||force){
+      shapes.forEach(function(s){s.rotation.x+=s.userData.rx*dt;s.rotation.y+=s.userData.ry*dt});
+      rings.forEach(function(r){r.rotation.z+=dt*.15});
+      robots.forEach(function(r){if(r.g.parent.visible)updRobot(r,tt)});
+    }
+    R.render(S,C);
+  }
+  function start(){
+    function loop(ts){requestAnimationFrame(loop);frame(ts);ui()}
+    if(reduce){render();return}
+    requestAnimationFrame(loop);
+  }
+  return {init:init,go:go,layout:layout,resize:resize,start:start,render:render,get ok(){return ok}};
+})();
+ 
+/* ---------- per-frame UI parallax / tilt ---------- */
+function ui(){
+  if(reduce)return;
+  var sy=window.scrollY;if(sy===lastSy)return;lastSy=sy;
+  var vh=innerHeight;
+  ghosts.forEach(function(g){g.el.style.transform='translate3d(0,'+(sy*g.d).toFixed(1)+'px,0)'});
+  vis.forEach(function(el){var r=el.getBoundingClientRect(),t=Math.max(-1,Math.min(1,(r.top+r.height/2-vh/2)/(vh/2)));el.style.setProperty('--sx',(t*4).toFixed(2)+'deg')});
+  drifts.forEach(function(d){var r=d.el.getBoundingClientRect(),t=(r.top+r.height/2-vh/2);d.el.style.transform='translate3d('+(t*d.dx).toFixed(1)+'px,0,0)'});
+}
+ 
+/* ---------- rain loop (second looping background layer) ---------- */
+(function(){
+  var c=$('#rain');if(!c)return;if(reduce){c.style.display='none';return}
+  var x=c.getContext('2d'),G='01∑π∫λΔ√≈∞≠∂θ'.split(''),cols=[],last=0,step=9;
+  function size(){c.width=Math.ceil(innerWidth/2);c.height=Math.ceil(innerHeight/2);var n=Math.ceil(c.width/step);cols=[];for(var i=0;i<n;i++)cols.push({y:Math.random()*c.height,v:30+Math.random()*60,len:6+((Math.random()*10)|0)})}
+  function draw(ts){
+    requestAnimationFrame(draw);if(ts-last<45)return;var dt=Math.min(.1,(ts-last)/1000);last=ts;
+    x.clearRect(0,0,c.width,c.height);x.font='9px JetBrains Mono, monospace';
+    for(var i=0;i<cols.length;i++){var o=cols[i];o.y+=o.v*dt;if(o.y>c.height+o.len*step){o.y=-Math.random()*80;o.v=30+Math.random()*60}
+      for(var j=0;j<o.len;j++){x.globalAlpha=j===0?1:(1-j/o.len)*.7;x.fillStyle=j===0?'#22D3EE':'#8B5CF6';x.fillText(G[(i*7+j+((o.y/step)|0))%G.length],i*step,o.y-j*step)}}
+  }
+  size();addEventListener('resize',debounce(size,200));requestAnimationFrame(draw);
+})();
+ 
+/* ---------- pointer tilt on panels ---------- */
+if(window.matchMedia('(hover:hover) and (pointer:fine)').matches&&!reduce){
+  var tiltEl=null,tx=0,ty=0,raf=0;
+  document.addEventListener('pointermove',function(e){
+    var p=e.target.closest&&e.target.closest('.panel');
+    if(tiltEl&&tiltEl!==p){tiltEl.style.setProperty('--hx','0deg');tiltEl.style.setProperty('--hy','0deg');tiltEl=null}
+    if(!p)return;tiltEl=p;var r=p.getBoundingClientRect();tx=((e.clientX-r.left)/r.width-.5)*5;ty=((e.clientY-r.top)/r.height-.5)*-4;
+    if(!raf)raf=requestAnimationFrame(function(){raf=0;if(tiltEl){tiltEl.style.setProperty('--hy',tx.toFixed(2)+'deg');tiltEl.style.setProperty('--hx',ty.toFixed(2)+'deg')}});
+  },{passive:true});
+}
+ 
+/* ---------- boot ---------- */
+renderAll();initWidgets();
+$$('[data-jump]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();var t=document.getElementById(a.dataset.jump);if(t)t.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'})})});
+$$('[data-nav]').forEach(function(a){a.addEventListener('click',function(){if(a.dataset.nav===current)window.scrollTo({top:0,behavior:reduce?'auto':'smooth'})})});
+var specs=$$('.mod');
+if(specs.length){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){$$('.index a').forEach(function(a){a.setAttribute('aria-current',String(a.dataset.jump===e.target.id))})}})},{rootMargin:'-35% 0px -60% 0px'});specs.forEach(function(s){io.observe(s)})}
+var glOk=world.init();
+if(!glOk)$('#world').style.display='none';
+show(pageFromHash(),true);
+observeAll();
+if(glOk)world.start();
+window.addEventListener('hashchange',function(){show(pageFromHash(),false);observeAll()});
+window.addEventListener('resize',debounce(relayout,120));
+window.addEventListener('load',relayout);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(relayout);
+if(window.ResizeObserver){new ResizeObserver(debounce(relayout,150)).observe($('#main'))}
+window.addEventListener('scroll',function(){if(reduce){if(glOk)world.render()}},{passive:true});
+})();
+</script>
